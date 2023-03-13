@@ -1,0 +1,9 @@
+version: '3'
+
+services:
+  currency-exchange-tg-tracker:
+    image: currency-exchange-tg-tracker
+    container_name: currency-exchange-tg-tracker
+    env_file:
+      - ../.env
+    restart: always
