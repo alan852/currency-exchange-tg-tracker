@@ -19,6 +19,7 @@ logging.basicConfig(
     format=get_env(ENV.LOG_FORMAT),
     level=get_env(ENV.LOG_LEVEL)
 )
+logger = logging.getLogger(__name__)
 
 chat_ids = get_chat_ids()
 
@@ -57,12 +58,17 @@ async def health_check(context: ContextTypes.DEFAULT_TYPE):
 async def report_exchange_rates(context: ContextTypes.DEFAULT_TYPE):
     api_token = get_env(ENV.API_TOKEN)
     if is_token_expired(api_token):
+        logger.info(f'Renew API token. Existing API token - {api_token}')
         api_token = renew_api_token()
     r = get_rates(get_env(ENV.API_HOST), api_token, get_env(ENV.SYMBOLS))
-    r['json']['timestamp'] = datetime.strptime(r['json']['timestamp'], get_env(ENV.JSON_TIMESTAMP_FORMAT)) \
-        .astimezone(pytz.timezone(get_env(ENV.DISPLAY_TZ)))
+    logger.info(f'Response from API server {r}')
+    try:
+        r['json']['timestamp'] = datetime.strptime(r['json']['timestamp'], get_env(ENV.JSON_TIMESTAMP_FORMAT)) \
+            .astimezone(pytz.timezone(get_env(ENV.DISPLAY_TZ)))
+    except:
+        logger.error(f'Unable to convert timestamp string {r["json"]["timestamp"]} using format {get_env(ENV.JSON_TIMESTAMP_FORMAT)}')
     message = [f'{_["symbol"]}: {_["rate"]}' for _ in r['json']['rates']]
-    message.append(f'({r["json"]["timestamp"].strftime(get_env(ENV.DISPLAY_TIMESTAMP_FORMAT))})')
+    message.append(f'({r["json"]["timestamp"].strftime(get_env(ENV.DISPLAY_TIMESTAMP_FORMAT)) if isinstance(r["json"]["timestamp"], datetime) else r["json"]["timestamp"]})')
     context.application.create_task(
         asyncio.gather(
             *(
@@ -76,7 +82,7 @@ async def report_exchange_rates(context: ContextTypes.DEFAULT_TYPE):
 if __name__ == '__main__':
     application = Application.builder().token(get_env(ENV.TELEGRAM_BOT_TOKEN)).rate_limiter(AIORateLimiter()).build()
 
-    first = datetime.now().replace(minute=0, second=0, microsecond=0)
+    first = datetime.now().replace(minute=int(get_env(ENV.FIRST_MINUTE)), second=0, microsecond=0)
     application.job_queue.run_repeating(report_exchange_rates, interval=int(get_env(ENV.REPORT_FREQUENCY)), first=first)
     application.job_queue.run_repeating(health_check, interval=60, first=first)
 

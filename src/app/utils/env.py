@@ -6,6 +6,7 @@ class ENV(Enum):
     TELEGRAM_BOT_TOKEN = {'name': 'TELEGRAM_BOT_TOKEN', 'default': ''}
     ADMIN_CHAT_ID = {'name': 'ADMIN_CHAT_ID', 'default': ''}
     ALLOWED_CHAT_IDS = {'name': 'ALLOWED_CHAT_IDS', 'default': ''}
+    FIRST_MINUTE = {'name': 'FIRST_MINUTE', 'default': ''}
     REPORT_FREQUENCY = {'name': 'REPORT_FREQUENCY', 'default': ''}
     LOG_FORMAT = {'name': 'LOG_FORMAT', 'default': ''}
     LOG_LEVEL = {'name': 'LOG_LEVEL', 'default': 'INFO'}
