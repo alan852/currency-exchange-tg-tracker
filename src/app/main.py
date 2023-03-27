@@ -30,25 +30,13 @@ async def error_handler(update: object, context: ContextTypes.DEFAULT_TYPE) -> N
 
     update_str = update.to_dict() if isinstance(update, Update) else str(update)
     message = (
-        f"An exception was raised while handling an update\n"
-        f"<pre>update = {html.escape(json.dumps(update_str, indent=2, ensure_ascii=False))}"
-        "</pre>\n\n"
-        f"<pre>context.chat_data = {html.escape(str(context.chat_data))}</pre>\n\n"
-        f"<pre>context.user_data = {html.escape(str(context.user_data))}</pre>\n\n"
-        f"<pre>{html.escape(tb_string)}</pre>"
+        f"An exception was raised\n"
+        f"update = {json.dumps(update_str, indent=2, ensure_ascii=False)}\n"
+        f"context.chat_data = {str(context.chat_data)}\n"
+        f"context.user_data = {str(context.user_data)}\n"
+        f"{tb_string}"
     )
-    context.application.create_task(
-        asyncio.gather(
-            *(
-                context.bot.send_message(
-                    chat_id=admin_id,
-                    text=message,
-                    parse_mode=ParseMode.HTML,
-                    rate_limit_args=5
-                ) for admin_id in chat_ids['admins']
-            )
-        )
-    )
+    logger.error(message)
 
 
 async def health_check(context: ContextTypes.DEFAULT_TYPE):
@@ -64,25 +52,19 @@ async def report_exchange_rates(context: ContextTypes.DEFAULT_TYPE):
     logger.info(f'Response from API server {r}')
     try:
         r['json']['timestamp'] = datetime.strptime(r['json']['timestamp'], get_env(ENV.JSON_TIMESTAMP_FORMAT)) \
-            .astimezone(pytz.timezone(get_env(ENV.DISPLAY_TZ)))
+            .astimezone(pytz.UTC).astimezone(pytz.timezone(get_env(ENV.DISPLAY_TZ)))
     except:
         logger.error(f'Unable to convert timestamp string {r["json"]["timestamp"]} using format {get_env(ENV.JSON_TIMESTAMP_FORMAT)}')
     message = [f'{_["symbol"]}: {_["rate"]}' for _ in r['json']['rates']]
     message.append(f'({r["json"]["timestamp"].strftime(get_env(ENV.DISPLAY_TIMESTAMP_FORMAT)) if isinstance(r["json"]["timestamp"], datetime) else r["json"]["timestamp"]})')
-    context.application.create_task(
-        asyncio.gather(
-            *(
-                context.bot.send_message(chat_id=user_id, text='\r\n'.join(message), rate_limit_args=5)
-                for user_id in chat_ids['users']
-            )
-        )
-    )
+    for user_id in chat_ids['users']:
+        await context.bot.send_message(chat_id=user_id, text='\r\n'.join(message))
 
 
 if __name__ == '__main__':
     application = Application.builder().token(get_env(ENV.TELEGRAM_BOT_TOKEN)).rate_limiter(AIORateLimiter()).build()
 
-    first = datetime.now().replace(minute=int(get_env(ENV.FIRST_MINUTE)), second=0, microsecond=0)
+    first = datetime.now().replace(minute=int(get_env(ENV.FIRST_MINUTE)), second=0, microsecond=0).astimezone(pytz.UTC)
     application.job_queue.run_repeating(report_exchange_rates, interval=int(get_env(ENV.REPORT_FREQUENCY)), first=first)
     application.job_queue.run_repeating(health_check, interval=60, first=first)
 
